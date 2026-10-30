@@ -1,12 +1,13 @@
 {
   "name": "nlpm",
-  "version": "1.4.3",
-  "description": "Natural-Language Programming reference knowledge \u2014 the 50 Rules, the 100-point scoring rubric, per-tool conventions (Claude Code / Codex CLI / Antigravity), anti-patterns, vocabulary discipline, and authoring guides, as loadable Codex skills. The interactive linting commands remain a Claude Code plugin; the cross-tool deterministic checker ships as a standalone Python binary (bin/nlpm-check).",
+  "version": "1.5.0",
+  "description": "Natural-Language Programming reference knowledge — the 50 Rules, the 100-point scoring rubric, per-tool conventions (Claude Code / Codex CLI / Antigravity), anti-patterns, vocabulary discipline, and authoring guides, as loadable Codex skills. The interactive linting commands remain a Claude Code plugin; the cross-tool deterministic checker ships as a standalone Python binary (bin/nlpm-check). This fork adds /nlpm:advise — product-readiness requirements (P01–P32) for AI-built products.",
   "author": {
-    "name": "xiaolai"
+    "name": "xiaolai",
+    "note": "fork maintained by shengdabai; ISC license preserved"
   },
-  "homepage": "https://nlpm.com",
-  "repository": "https://github.com/xiaolai/nlpm",
+  "homepage": "https://github.com/shengdabai/nlpm",
+  "repository": "https://github.com/shengdabai/nlpm",
   "license": "ISC",
   "keywords": [
     "nlp",
@@ -26,9 +27,9 @@
   "hooks": "./codex/hooks.json",
   "interface": {
     "displayName": "nlpm",
-    "shortDescription": "Natural-Language Programming reference knowledge \u2014 50 Rules, scoring rubric, per-tool conventions, authoring guides \u2014 as Codex skills.",
-    "longDescription": "nlpm's reference-knowledge skills for Codex CLI: the 50 Rules of Natural Language Programming, the 100-point scoring rubric, per-tool conventions for Claude Code / Codex CLI / Antigravity, anti-patterns, the R51 vocabulary discipline framework, and authoring guides for skills, agents, hooks, rules, plugins, and prompts. These are knowledge skills, not commands \u2014 load $nlpm-rules and $nlpm-scoring to score an artifact, $nlpm-conventions-codex for the Codex skill layout, etc. The interactive /nlpm:* linting commands orchestrate sub-agents and remain a Claude Code plugin; for tool-agnostic deterministic checks use the standalone bin/nlpm-check.",
-    "developerName": "xiaolai",
+    "shortDescription": "Natural-Language Programming reference knowledge — 50 Rules, scoring rubric, per-tool conventions, authoring guides — as Codex skills.",
+    "longDescription": "nlpm's reference-knowledge skills for Codex CLI: the 50 Rules of Natural Language Programming, the 100-point scoring rubric, per-tool conventions for Claude Code / Codex CLI / Antigravity, anti-patterns, the R51 vocabulary discipline framework, and authoring guides for skills, agents, hooks, rules, plugins, and prompts. These are knowledge skills, not commands — load $nlpm-rules and $nlpm-scoring to score an artifact, $nlpm-conventions-codex for the Codex skill layout, etc. The interactive /nlpm:* linting commands orchestrate sub-agents and remain a Claude Code plugin; for tool-agnostic deterministic checks use the standalone bin/nlpm-check.",
+    "developerName": "xiaolai (fork: shengdabai)",
     "category": "Coding",
     "capabilities": [
       "Read"
@@ -36,7 +37,7 @@
     "defaultPrompt": [
       "Score this skill against the nlpm rules."
     ],
-    "websiteURL": "https://github.com/xiaolai/nlpm",
+    "websiteURL": "https://github.com/shengdabai/nlpm",
     "screenshots": []
   }
 }

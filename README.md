@@ -1,4 +1,22 @@
-# nlpm
+# nlpm (fork by shengdabai)
+
+This is a fork of [xiaolai/nlpm](https://github.com/xiaolai/nlpm) (ISC license, copyright Xiaolai Li — see `LICENSE`). Everything below the fork notes is upstream nlpm; the fork adds one capability:
+
+**`/nlpm:advise [path] [--save]`** — point it at a product built with AI (Claude Code, Codex, anything) and get a short, evidence-backed list of **requirements** (P0–P3) with acceptance criteria and a verification layer, ready to paste into issues or a PRD. The rule catalog `P01–P32` (`skills/nlpm/product-advising/SKILL.md`) comes from the maintainer's own release checklists and failure log: readiness gates (self-use → others → paid), security (unauthenticated writes, fail-open webhooks, secrets in config), reliability (in-memory rate limits, non-atomic grants, migrations without a recovery point), front-end (390 px overflow, unpinned CDN), repository hygiene and release discipline. The advisor only reads; it never edits or deploys.
+
+Install from this fork:
+
+```bash
+claude plugin marketplace add shengdabai/nlpm
+claude plugin install nlpm@shengdabai --scope user
+/nlpm:advise ~/path/to/your-product --save
+```
+
+Upstream's `/nlpm:*` commands, the 50 Rules, scoring rubric and `bin/nlpm-check` are unchanged. The auditor GitHub Actions that audit third-party repositories are disabled on this fork. To pull upstream changes: `git fetch upstream && git merge upstream/main`.
+
+---
+
+# nlpm (upstream README)
 
 [![Validated by NLPM](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/xiaolai/nlpm/main/nlpm-badge.json)](https://github.com/xiaolai/nlpm/blob/main/nlpm-badge.json)
 

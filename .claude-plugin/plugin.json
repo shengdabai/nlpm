@@ -1,13 +1,14 @@
 {
   "name": "nlpm",
-  "version": "1.4.3",
-  "description": "Natural-Language Programming Manager \u2014 score, check, fix, and test NL artifacts across Claude Code, Codex CLI, and Antigravity. Tier-aware scoring with per-tool overlays.",
+  "version": "1.5.0",
+  "description": "Natural-Language Programming Manager — score, check, fix, and test NL artifacts across Claude Code, Codex CLI, and Antigravity. Tier-aware scoring with per-tool overlays. This fork adds /nlpm:advise — product-readiness requirements (P01–P32) for AI-built products.",
   "author": {
-    "name": "xiaolai"
+    "name": "xiaolai",
+    "note": "fork maintained by shengdabai; ISC license preserved"
   },
   "license": "ISC",
-  "homepage": "https://nlpm.com",
-  "repository": "https://github.com/xiaolai/nlpm",
+  "homepage": "https://github.com/shengdabai/nlpm",
+  "repository": "https://github.com/shengdabai/nlpm",
   "keywords": [
     "nlp",
     "lint",

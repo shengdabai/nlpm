@@ -1,24 +1,24 @@
 {
-  "name": "xiaolai",
+  "name": "shengdabai",
   "owner": {
-    "name": "xiaolai"
+    "name": "shengdabai"
   },
   "metadata": {
-    "description": "nlpm \u2014 Natural-Language Programming Manager by xiaolai"
+    "description": "nlpm fork by shengdabai — Natural-Language Programming Manager (by xiaolai) plus /nlpm:advise for AI-built products"
   },
   "plugins": [
     {
       "name": "nlpm",
       "source": {
         "source": "github",
-        "repo": "xiaolai/nlpm"
+        "repo": "shengdabai/nlpm"
       },
-      "description": "Natural-Language Programming Manager \u2014 score, check, fix, and test NL artifacts across Claude Code, Codex CLI, and Antigravity. Tier-aware scoring with per-tool overlays.",
-      "version": "1.4.3",
+      "description": "Natural-Language Programming Manager — score, check, fix, and test NL artifacts across Claude Code, Codex CLI, and Antigravity. Tier-aware scoring with per-tool overlays. Fork adds /nlpm:advise: P0–P3 requirements for AI-built products.",
+      "version": "1.5.0",
       "author": {
         "name": "xiaolai"
       },
-      "repository": "https://github.com/xiaolai/nlpm",
+      "repository": "https://github.com/shengdabai/nlpm",
       "license": "ISC",
       "keywords": [
         "nlp",
@@ -31,7 +31,9 @@
         "claude",
         "codex",
         "antigravity",
-        "multi-tool"
+        "multi-tool",
+        "product-advice",
+        "requirements"
       ],
       "category": "developer-tools"
     }
