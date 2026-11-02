@@ -1,0 +1,202 @@
+#!/usr/bin/env python3
+"""nlpm-advise-verify — mechanically check the evidence behind a /nlpm:advise report.
+
+The advisor ends its report with a fenced `nlpm-findings` JSON block. A model can cite
+a file or line that does not exist, and cheaper models do so more often. This script
+checks each citation against the repository, using no model:
+
+  - the path exists inside the target (no escaping through `..` or symlinks)
+  - the line number is inside the file
+  - when the evidence has a `quote`, that text appears on that line (allowing 2 lines of drift)
+
+A finding is `failed` when any citation does not hold. It is `verified` when it has citations
+and each one gives a line or a quote that was checked. Otherwise it is `unverifiable`: it has
+no citation (for example, command output only) or a citation with a bare file name, which
+proves the file exists and nothing more.
+
+The findings table must match the block: same number of rows and same rule ids. Otherwise a
+wrong row could stay in the table with no citation for this script to check.
+
+A citation with `"in_state_dir": true` is checked against --state-dir instead of --target.
+
+Usage:
+    nlpm-advise-verify REPORT.md --target REPO_DIR [--state-dir DIR] [--json]
+
+Exit status: 0 all checkable findings hold; 1 at least one failed; 2 usage or report error.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+SCHEMA = 1
+QUOTE_DRIFT_LINES = 2
+BLOCK = re.compile(r"```nlpm-findings\s*\n(.*?)\n```", re.DOTALL)
+SECRET_NAME = re.compile(r"(^|/)(\.env[^/]*|.*\.pem|.*\.key|id_rsa[^/]*|credentials\.[^/]*|secrets\.[^/]*)$")
+
+
+def load_findings(report: str) -> list[dict]:
+    """Return the findings list from the report's last nlpm-findings block."""
+    blocks = BLOCK.findall(report)
+    if not blocks:
+        raise ValueError("report has no nlpm-findings block")
+    data = json.loads(blocks[-1])
+    if not isinstance(data, dict) or data.get("schema") != SCHEMA:
+        raise ValueError(f"nlpm-findings schema must be {SCHEMA}")
+    findings = data.get("findings")
+    if not isinstance(findings, list):
+        raise ValueError("nlpm-findings.findings must be a list")  # noqa: TRY004 - main() maps ValueError to exit 2.
+    for number, finding in enumerate(findings, start=1):
+        validate_finding(finding, number)
+    return findings
+
+
+def validate_finding(finding: object, number: int) -> None:
+    """Raise ValueError when a finding has the wrong shape, so a model's typo cannot crash the check."""
+    if not isinstance(finding, dict):
+        raise ValueError(f"finding {number} must be an object")  # noqa: TRY004 - main() maps ValueError to exit 2.
+    evidence = finding.get("evidence", [])
+    if evidence is None:
+        return
+    if not isinstance(evidence, list):
+        raise ValueError(f"finding {number}: evidence must be a list")  # noqa: TRY004 - main() maps ValueError to exit 2.
+    for citation in evidence:
+        if not isinstance(citation, dict):
+            raise ValueError(f"finding {number}: each citation must be an object")  # noqa: TRY004 - main() maps ValueError to exit 2.
+        line = citation.get("line")
+        if line is not None and (not isinstance(line, int) or isinstance(line, bool)):
+            raise ValueError(f"finding {number}: citation line must be an integer")
+        quote = citation.get("quote")
+        if quote is not None and not isinstance(quote, str):
+            raise ValueError(f"finding {number}: citation quote must be a string")
+
+
+def table_rules(report: str) -> list[str] | None:
+    """Return the rule id of each findings-table row, or None when the report has no such section."""
+    section = re.search(r"^## 发现清单[^\n]*\n(.*?)(?=^## |\Z)", report, re.DOTALL | re.MULTILINE)
+    if section is None:
+        return None
+    rules = []
+    for line in section.group(1).splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if not line.lstrip().startswith("|") or len(cells) < 2:
+            continue
+        if not re.match(r"P[0-3]\b", cells[0]):
+            continue  # Header and separator rows have no severity in the first column.
+        match = re.search(r"P\d\d", cells[1])
+        rules.append(match.group(0) if match else "")
+    return rules
+
+
+def table_mismatch(report: str, findings: list[dict]) -> str | None:
+    """Return why the findings table and the block disagree, or None when they match."""
+    rows = table_rules(report)
+    if rows is None:
+        return "report has no 发现清单 section"
+    blocked = [str(finding.get("rule", ""))[:3] for finding in findings]
+    if sorted(rows) != sorted(blocked):
+        return f"table has {len(rows)} rows ({sorted(rows)}), block has {len(blocked)} ({sorted(blocked)})"
+    return None
+
+
+def check_citation(root: Path, citation: dict) -> str | None:
+    """Return a reason the citation fails, or None when it holds."""
+    relative = citation.get("path")
+    if not isinstance(relative, str) or not relative:
+        return "citation has no path"
+    if SECRET_NAME.search(relative):
+        return f"{relative}: names a secret-style file, which the advisor must not open"
+    try:
+        candidate = (root / relative).resolve()
+        resolved = candidate.relative_to(root)
+    except (ValueError, OSError, RuntimeError):  # NUL bytes, over-long names, link loops, escaping paths.
+        return f"{relative!r}: outside the target or not a usable path"
+    if SECRET_NAME.search(resolved.as_posix()):  # A link with a plain name can point at a secret file.
+        return f"{relative}: resolves to a secret-style file, which the advisor must not open"
+    try:
+        if not candidate.is_file():
+            return f"{relative}: not a file in the target"
+    except (ValueError, OSError):
+        return f"{relative!r}: not a usable path"
+    line = citation.get("line")
+    quote = citation.get("quote")
+    if line is None and not quote:
+        return None
+    try:
+        lines = candidate.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError as error:
+        return f"{relative}: unreadable ({error.strerror})"
+    if line is not None and (line < 1 or line > len(lines)):
+        return f"{relative}:{line}: line is outside the file ({len(lines)} lines)"
+    if quote:
+        start = 0 if line is None else max(0, line - 1 - QUOTE_DRIFT_LINES)
+        end = len(lines) if line is None else line + QUOTE_DRIFT_LINES
+        if not any(quote in text for text in lines[start:end]):
+            where = relative if line is None else f"{relative}:{line}"
+            return f"{where}: quoted text not found"
+    return None
+
+
+def citation_root(citation: dict, root: Path, state_dir: Path | None) -> Path | None:
+    return state_dir if citation.get("in_state_dir") else root
+
+
+def verify(findings: list[dict], root: Path, state_dir: Path | None = None) -> list[dict]:
+    """Return one result per finding, in order."""
+    results = []
+    for finding in findings:
+        citations = finding.get("evidence") or []
+        reasons = []
+        for citation in citations:
+            base = citation_root(citation, root, state_dir)
+            reason = check_citation(base, citation) if base else f"{citation.get('path')}: no --state-dir given"
+            if reason:
+                reasons.append(reason)
+        specific = bool(citations) and all(c.get("line") is not None or c.get("quote") for c in citations)
+        status = "failed" if reasons else ("verified" if specific else "unverifiable")
+        results.append({"id": finding.get("id"), "rule": finding.get("rule"), "status": status, "reasons": reasons})
+    return results
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Check the evidence behind a /nlpm:advise report.")
+    parser.add_argument("report", type=Path)
+    parser.add_argument("--target", type=Path, required=True)
+    parser.add_argument("--state-dir", type=Path)
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    args = parser.parse_args(argv)
+    root = args.target.resolve()
+    if not root.is_dir():
+        print(f"nlpm-advise-verify: target is not a directory: {args.target}", file=sys.stderr)
+        return 2
+    state_dir = args.state_dir.resolve() if args.state_dir else None
+    if state_dir is not None and not state_dir.is_dir():
+        print(f"nlpm-advise-verify: state dir is not a directory: {args.state_dir}", file=sys.stderr)
+        return 2
+    try:
+        report = args.report.read_text(encoding="utf-8")
+        findings = load_findings(report)
+    except (OSError, ValueError) as error:
+        print(f"nlpm-advise-verify: {error}", file=sys.stderr)
+        return 2
+    results = verify(findings, root, state_dir)
+    failed = [r for r in results if r["status"] == "failed"]
+    mismatch = table_mismatch(report, findings)
+    if args.as_json:
+        print(json.dumps({"results": results, "table_mismatch": mismatch}, ensure_ascii=False, indent=2))
+    else:
+        counts = {s: sum(r["status"] == s for r in results) for s in ("verified", "failed", "unverifiable")}
+        print(f"nlpm-advise-verify: {counts['verified']} verified, {counts['failed']} failed, "
+              f"{counts['unverifiable']} unverifiable")
+        for result in failed:
+            print(f"  {result['id']} ({result['rule']}): " + "; ".join(result["reasons"]))
+        if mismatch:
+            print(f"  table and block disagree: {mismatch}")
+    return 1 if failed or mismatch else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

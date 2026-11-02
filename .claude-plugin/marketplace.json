@@ -14,7 +14,7 @@
         "repo": "shengdabai/nlpm"
       },
       "description": "Natural-Language Programming Manager — score, check, fix, and test NL artifacts across Claude Code, Codex CLI, and Antigravity. Tier-aware scoring with per-tool overlays. Fork adds /nlpm:advise: P0–P3 requirements for AI-built products.",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "author": {
         "name": "xiaolai"
       },

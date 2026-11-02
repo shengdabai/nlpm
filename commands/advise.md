@@ -1,7 +1,7 @@
 ---
 name: advise
-description: "Advise an AI-built product — profile the repo, apply rules P01–P32, return P0–P3 requirements with evidence, acceptance criteria and verification layer; optionally save the report"
-argument-hint: "[path] [--save] [--no-score] [--lang zh|en]"
+description: "Advise an AI-built product — profile the repo, apply rules P01–P36, return P0–P3 requirements with evidence, acceptance criteria and verification layer; optionally save the report"
+argument-hint: "[path] [--save] [--out DIR] [--state-dir DIR] [--model haiku|sonnet|opus] [--no-score] [--lang zh|en]"
 allowed-tools: Read, Write, Glob, Grep, Bash, Task
 ---
 
@@ -20,7 +20,10 @@ $ARGUMENTS
 | (empty) | Target = current working directory |
 | absolute path | Target = that path |
 | relative path | Target = `<cwd>/<path>` |
-| `--save` | Also write the report to `<target>/.claude/nlpm-advise/<YYYY-MM-DD>.md` |
+| `--save` | Also save the report (see Step 5 for the location rule) |
+| `--out DIR` | Save the report to `DIR/<YYYY-MM-DD>.md` instead; implies `--save` |
+| `--state-dir DIR` | Read gitignored project state, such as `.omc/usage-log.md`, from `DIR`. Use it when `target` is a clean clone |
+| `--model NAME` | Run the advisor on `haiku`, `sonnet` or `opus` (default: the agent's own model). Use cheaper models for routine runs; Step 4b catches invented evidence |
 | `--no-score` | Skip the NL artifact scoring step |
 | `--lang en` | English report (default `zh`) |
 
@@ -42,14 +45,39 @@ Dispatch the `nlpm:advisor` agent with:
 - `profile_hints`: any free text the user included after the path
 - `nl_scores`
 - `lang`
+- `state_dir`, when given
+- the `model` dispatch parameter, when `--model` is given
 
 Wait for the single Markdown report.
+
+### Step 4b: Verify the evidence
+
+Write the report to a temporary file and run:
+
+```
+python3 "${CLAUDE_PLUGIN_ROOT}/bin/nlpm-advise-verify" <report-file> --target <target> [--state-dir <state_dir>] --json
+```
+
+- Exit 0: continue.
+- Exit 1: for each `failed` finding, move its table row and issue block to "待确认" and add the verifier's reason. Do not silently fix the citation. When `table_mismatch` is set, add the table's missing rows to the block or move them to "待确认". Then recount the findings and rewrite the one-sentence judgment if it relied on a failed finding, so no part of the report still presents it as fact.
+- Findings reported as `unverifiable` stay in the table, marked "证据未机器核验". The citation names only a file, or the evidence is command output.
+- Exit 2 (no valid `nlpm-findings` block): add one line at the top of the report saying the evidence was not machine-checked.
+
+In the `nlpm-findings` block, add `"verification": "verified" | "failed" | "unverifiable"` to every entry. Keep failed entries in the block so reports can be compared, because automation must act only on `verified` entries.
+
+Print the verifier's one-line summary under the report title.
 
 ### Step 5: Present and optionally save
 
 Print the report unchanged.
 
-If `--save`: create `<target>/.claude/nlpm-advise/` when missing and write the report to `<YYYY-MM-DD>.md` (append `-2`, `-3` when the file exists). Then append one line to `<target>/.omc/usage-log.md` when that file exists:
+If `--save`, choose the location, because a report lists the product's weaknesses and must not be committed by accident:
+
+1. `--out DIR` when given.
+2. `<target>/.claude/nlpm-advise/` when `target` is not a git repository, or when `git -C <target> check-ignore -q .claude/nlpm-advise/x.md` exits 0.
+3. Otherwise `~/.claude/nlpm-advise/<repository-name>/`, and say in one line that the in-repo path is not gitignored.
+
+Create the directory when missing and write the report to `<YYYY-MM-DD>.md` (append `-2`, `-3` when the file exists). Then append one line to `<target>/.omc/usage-log.md` when that file exists:
 
 ```
 - <YYYY-MM-DD> nlpm advise: <count P0> P0 / <count P1> P1 / <count P2> P2 — report .claude/nlpm-advise/<file>
