@@ -1,13 +1,13 @@
 ---
 name: product-advising
-description: "Rule catalog P01–P32 for advising AI-built products: readiness gates, security, reliability, front-end, repo hygiene, release. Used by the advisor agent behind /nlpm:advise."
-version: 0.1.0
+description: "Rule catalog P01–P36 for advising AI-built products: readiness gates, security, reliability, front-end, repo hygiene, release, selling and content rights. Used by the advisor agent behind /nlpm:advise."
+version: 0.2.0
 user-invocable: false
 ---
 
 # Product Advising Rules（给 AI 做出来的产品提建议与需求）
 
-> Scope: this catalog is the fork maintainer's layer on top of nlpm. nlpm's R01–R50 score the *natural-language artifacts* (skills, agents, commands, CLAUDE.md). P01–P32 look at the *product repository itself* — code, config, tests, deploy files — and turn what they find into a prioritized list of requirements a maintainer can paste into an issue tracker or a PRD. They do not replace a security audit; every finding must cite a file and line.
+> Scope: this catalog is the fork maintainer's layer on top of nlpm. nlpm's R01–R50 score the *natural-language artifacts* (skills, agents, commands, CLAUDE.md). P01–P36 look at the *product repository itself* — code, config, tests, deploy files — and turn what they find into a prioritized list of requirements a maintainer can paste into an issue tracker or a PRD. They do not replace a security audit; every finding must cite a file and line.
 
 ## 1. Severity
 
@@ -67,7 +67,7 @@ Columns: **Check** = what to look for. **How** = concrete commands or file patte
 |---|---|---|---|---|---|
 | P16 | P1 | Check-then-write without atomicity | read → branch → insert for grants, credits, order creation; no unique constraint or transaction | "Make the operation idempotent with a unique constraint or a transaction / compare-and-swap." | concurrent test: two identical requests → one effect |
 | P17 | P1 | State in `globalThis` or module scope on serverless | `globalThis.` assignments holding counters, caches of user data, snapshots | "Persist state to a table or KV; module scope is a cache at most." | restart test |
-| P18 | P1 | Migrations without a recovery point or rollback note | `migrations/` or `drizzle/` exists; no README / runbook line on snapshot or Time Travel and rollback | "Before each production migration record a recovery point and the command to roll back." | runbook line + one rehearsal |
+| P18 | P1 | Migrations without a recovery point or rollback note, or that cannot build an empty database | `migrations/` or `drizzle/` exists; no README / runbook line on snapshot or Time Travel and rollback; the migration list in the README is shorter than the directory; syntax the engine rejects, such as Postgres `create policy if not exists` | "Before each production migration record a recovery point and the command to roll back. All migrations run in order on an empty database." | runbook line + one rehearsal; `psql -v ON_ERROR_STOP=1` over every file exits 0 on a disposable database |
 | P19 | P1 | Dependency hygiene | lockfile missing or untracked; versions `*` / `latest`; non-official registry in lockfile `resolved`; remote install scripts piped straight into a shell in Dockerfile / CI; `pull_request_target` using secrets | "Commit the lockfile, pin versions, install only from the official registry, replace remote-script installs with download → checksum → run." | `git ls-files` shows lockfile; audit of `resolved` hosts |
 | P20 | P1 | Known-vulnerable dependencies or framework behind its security patch | `npm audit --omit=dev --audit-level=high` / `pnpm audit --prod` / `pip-audit`; framework version vs its latest security release | "Upgrade to the fixed version; where impossible, document the compensating control and an expiry date." | audit high = 0 or documented exception |
 
@@ -84,7 +84,7 @@ Columns: **Check** = what to look for. **How** = concrete commands or file patte
 
 | ID | Level | Check | How | Requirement | Acceptance |
 |---|---|---|---|---|---|
-| P25 | P1 | False completion markers | grep `TODO`, `FIXME`, `test.skip`, `.only(`, `NotImplemented`, `throw new Error("not implemented")`, placeholder returns | "Implement or remove each marker; a marker in a shipped path blocks release." | grep returns 0 in changed files |
+| P25 | P1 | False completion markers, or promises with no code behind them | grep `TODO`, `FIXME`, `test.skip`, `.only(`, `NotImplemented`, `throw new Error("not implemented")`, placeholder returns; a handler that does nothing but returns `ok: true`; each feature promised in README, pricing or terms pages, grepped in the code | "Implement or remove each marker, and make each public promise true or remove it; a marker in a shipped path blocks release." | grep returns 0 in changed files; each promise maps to code or is gone |
 | P26 | P1 | Tests that cannot fail | test files with no assertion; mocks that return the asserted value; test suite absent for the core path | "Each core path has at least one test that fails when the behavior is broken." | mutation spot-check: break the code, test goes red |
 | P27 | P2 | Session and sync debris committed | `.omc/state`, `.claude/settings.local.json`, `*.local.md`, iCloud duplicates (`name 2/`, `.git 2`), `.DS_Store`, `node_modules` | "Untrack debris, add ignore rules; on iCloud-synced folders keep repos in `*.nosync` directories with a symlink." | `git ls-files` clean |
 | P28 | P2 | Machine-specific or internal literals | absolute paths `/Users/`, `/Volumes/`; internal hostnames, ports, chat or channel ids hard-coded; raise to P0 if the literal is a credential | "Move machine-specific values to configuration; internal identifiers come from environment variables." | grep returns 0 |
@@ -93,6 +93,17 @@ Columns: **Check** = what to look for. **How** = concrete commands or file patte
 | P31 | P1 | Release without a pre-launch check or rollback path | no launch-check report for the current HEAD; README / runbook has no "how to roll back in 10 minutes" | "Run the ten-category pre-launch check on this HEAD and write the rollback steps before opening traffic." | report file dated after the last commit |
 | P32 | P2 | README does not say how to run, test, and what it does not do | missing run command, test command, limits section | "README answers: how to run it, how to test it, what it will not do." | three sections present |
 
+### 3.6 Selling, environments and rights
+
+Added after real runs on live products, where each of these fell between the rows above.
+
+| ID | Level | Check | How | Requirement | Acceptance |
+|---|---|---|---|---|---|
+| P33 | P1 (P0 when real money can be taken) | Items that can be bought but have no delivery path | list every plan, price or SKU id from the plan table or price config; grep each id outside that file and outside price-creation scripts; compare with the delivery promise in terms and pricing pages | "Every purchasable item declares how it is delivered. An item with no delivery path cannot be bought." | a test walks every item: a declared item has a path from payment to delivery, an undeclared item cannot start checkout |
+| P34 | P1 (P0 when a preview can write production data) | Preview or staging deployments share production data or live payments | `wrangler.toml` with top-level D1, R2 or KV bindings and no `[env.preview]`; Vercel variables scoped to all environments; live payment mode in the shared config; PR comments showing preview deployments. The platform's inheritance rule needs its docs or dashboard, so state what you did not verify | "Preview deployments use their own database, storage and test payment mode." | data written by a preview appears only in the preview database |
+| P35 | P1 (P0 when the repository is public) | Third-party content under a license the owner cannot grant | exam papers, scanned pages, scraped text, images or audio in a repository whose `LICENSE` covers everything; rights fields such as `copyrightStatus: cleared` hard-coded by a script instead of recorded per source | "Record the source and rights of third-party content. Remove what cannot be shown to be cleared, and scope the license to what the owner wrote." | each content source has a recorded right; no rights value is hard-coded; the license states its scope |
+| P36 | P0 when the database is reachable by clients, otherwise P1 | Tables with no row-level access control | compare table names from `create table` with names from `enable row level security` in the migrations, using `comm -23`; grep for `revoke` and `grant`. Production state needs the database itself, so state what you did not verify | "Every table in an exposed schema has row-level security, and public roles have no table access they do not need." | with the public key, reads return empty or 401/403 and writes return 401/403; `pg_class` shows 0 exposed tables without RLS |
+
 ## 4. How to read a product before applying the catalog
 
 1. **Profile it in five lines** — entry type (new product / fix / new capability / small change), capabilities present (server, login, payment, database, public delivery), risk level by what this change touches, current gate (1 self-use / 2 others / 3 paid), deployment target. Do not infer "commercial" from architecture; look for pricing pages, payment code, or a stated goal.
@@ -100,6 +111,8 @@ Columns: **Check** = what to look for. **How** = concrete commands or file patte
 3. **Run only the rows the profile makes relevant.** A static single-page tool skips 3.2 server rows and 3.3 entirely; say so under "Not applicable".
 4. **Cite evidence** as `path:line` or a command and its first output line. A finding without evidence is a question for the maintainer, not a requirement.
 5. **Write the requirement sentence so it can be pasted unchanged** into an issue: one behavior, one acceptance criterion, one verification layer.
+6. **Absence is evidence only when the file could be present.** A clean clone has no gitignored files. Before reporting a missing file, run `git check-ignore`. If the file is ignored and no `state_dir` was given, put it under "待确认", not in the findings.
+7. **Lead with what can hurt someone.** The one-sentence judgment names the top money, data or security finding when one exists. Gate evidence comes next, not first.
 
 ## 5. Output contract
 
@@ -114,9 +127,15 @@ The advisor returns Markdown in this order. Default language is Chinese; switch 
 ## 画像
 入口 / 能力勾选 / 风险级别 / 当前门 / 部署目标 — five short lines
 
+## 门禁备注
+<P01–P04 hits, one line each. These are gate evidence for the owner, not work for a coding session, so they do not enter the findings table or the issue blocks.>
+
 ## 发现清单
 | 级别 | 规则 | 证据 | 影响 | 需求 | 验收标准 | 验证层 |
 (P0 first; at most 15 rows; group the rest under "其余观察")
+
+## 待确认
+<what needs a dashboard, a production database or the owner's answer>
 
 ## 可直接贴进 issue 的需求
 ### [P0] <title>
@@ -131,6 +150,29 @@ The advisor returns Markdown in this order. Default language is Chinese; switch 
 
 ## NL 工件分数
 <table from the nlpm scorer, or "no NL artifacts found">
+
+## 机器可读
+<the nlpm-findings block below, as the last thing in the report>
 ```
 
 Keep the whole report under 250 lines. When nothing reaches P0 or P1, say so in the first line instead of inflating P2 items.
+
+### The nlpm-findings block
+
+One entry per row of the findings table. `bin/nlpm-advise-verify` checks every citation against the repository, so copy `quote` exactly from the cited line and keep it short.
+
+````
+```nlpm-findings
+{"schema": 1, "findings": [
+  {"id": "F1", "level": "P0", "rule": "P05", "title": "one line, no secret values",
+   "security": true, "ai_fixable": true,
+   "evidence": [{"path": "src/app/api/items/route.ts", "line": 12, "quote": "export async function POST"}],
+   "requirement": "the issue sentence", "acceptance": "what proves it done", "layer": "integration"}
+]}
+```
+````
+
+- `security`: true when public text about this finding could help an attacker. Automation must keep such findings out of public issues and public PR text.
+- `ai_fixable`: true only when a coding session can finish it alone. False when it needs a human decision, production access, new content or a credential.
+- `evidence`: leave it empty when the only evidence is command output; the verifier then reports `unverifiable`, not `verified`.
+- `in_state_dir`: set true on a citation that lives in `state_dir` rather than `target`.

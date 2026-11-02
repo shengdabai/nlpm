@@ -2,7 +2,7 @@
 
 This is a fork of [xiaolai/nlpm](https://github.com/xiaolai/nlpm) (ISC license, copyright Xiaolai Li — see `LICENSE`). Everything below the fork notes is upstream nlpm; the fork adds one capability:
 
-**`/nlpm:advise [path] [--save]`** — point it at a product built with AI (Claude Code, Codex, anything) and get a short, evidence-backed list of **requirements** (P0–P3) with acceptance criteria and a verification layer, ready to paste into issues or a PRD. The rule catalog `P01–P32` (`skills/nlpm/product-advising/SKILL.md`) comes from the maintainer's own release checklists and failure log: readiness gates (self-use → others → paid), security (unauthenticated writes, fail-open webhooks, secrets in config), reliability (in-memory rate limits, non-atomic grants, migrations without a recovery point), front-end (390 px overflow, unpinned CDN), repository hygiene and release discipline. The advisor only reads; it never edits or deploys.
+**`/nlpm:advise [path] [--save]`** — point it at a product built with AI (Claude Code, Codex, anything) and get a short, evidence-backed list of **requirements** (P0–P3) with acceptance criteria and a verification layer. Rules P01–P36 cover readiness gates, security, reliability, front-end, repository hygiene, release, selling and content rights. It reads and reports; it changes nothing.
 
 Install from this fork:
 
@@ -12,7 +12,19 @@ claude plugin install nlpm@shengdabai --scope user
 /nlpm:advise ~/path/to/your-product --save
 ```
 
-Upstream's `/nlpm:*` commands, the 50 Rules, scoring rubric and `bin/nlpm-check` are unchanged. The auditor GitHub Actions that audit third-party repositories are disabled on this fork. To pull upstream changes: `git fetch upstream && git merge upstream/main`.
+| Flag | Use |
+|---|---|
+| `--save` | Save the report. If the in-repo path is not gitignored, it goes to `~/.claude/nlpm-advise/<repo>/`, because a report lists weaknesses |
+| `--out DIR` | Save the report to a directory you choose |
+| `--state-dir DIR` | Point at gitignored project state when the target is a clean clone |
+| `--model haiku\|sonnet\|opus` | Pick the model. A real run on Opus took 13–15 minutes and about 260,000–290,000 tokens, so use cheaper models for routine runs |
+| `--no-score` | Skip scoring the repo's NL artifacts |
+
+**Evidence is machine-checked.** Every report ends with a JSON block of findings. `bin/nlpm-advise-verify REPORT --target REPO` confirms each cited file, line and quote exists, with no model involved. A finding that fails moves to "待确认" instead of being presented as fact; one with no file, line or quote to check is marked as not machine-checked. This is what makes cheaper models usable.
+
+**What it does not do.** It reads code only: it does not run the product, its tests or anything in production, so findings that depend on a live database or a hosting dashboard are marked unverified. It is a requirements list, not a security audit.
+
+Upstream's other `/nlpm:*` commands, the 50 Rules, the scoring rubric and `bin/nlpm-check` are unchanged. The auditor GitHub Actions that audit third-party repositories are disabled on this fork. To pull upstream changes: `git fetch upstream && git merge upstream/main`.
 
 ---
 
